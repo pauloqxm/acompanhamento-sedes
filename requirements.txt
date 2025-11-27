@@ -1,1 +1,9 @@
-python
+streamlit
+pandas
+numpy
+altair
+folium
+streamlit-folium
+branca
+python-dateutil
+zoneinfo
