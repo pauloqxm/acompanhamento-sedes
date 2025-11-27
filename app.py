@@ -961,12 +961,23 @@ for col in ["Vazão_LH", "Vazão_estimada_LH", "Cloretos"]:
     if col in tabela.columns:
         tabela[col] = pd.to_numeric(tabela[col], errors="coerce")
 
-def style_dataframe(df):
-    return df.style.format({
-        'Vazão_LH': '{:,.0f} L/h',
-        'Vazão_estimada_LH': '{:,.0f} L/h',
-        'Cloretos': '{:.2f}'
-    }, na_rep="-").background_gradient(subset=['Vazão_LH', 'Vazão_estimada_LH'], cmap='Blues')
+def style_dataframe(df: pd.DataFrame):
+    """Formatação segura para evitar erro quando colunas não existirem."""
+    fmt = {}
+    if "Vazão_LH" in df.columns:
+        fmt["Vazão_LH"] = "{:,.0f} L/h"
+    if "Vazão_estimada_LH" in df.columns:
+        fmt["Vazão_estimada_LH"] = "{:,.0f} L/h"
+    if "Cloretos" in df.columns:
+        fmt["Cloretos"] = "{:.2f}"
+
+    styler = df.style.format(fmt, na_rep="-")
+
+    subset_cols = [c for c in ["Vazão_LH", "Vazão_estimada_LH"] if c in df.columns]
+    if subset_cols:
+        styler = styler.background_gradient(subset=subset_cols, cmap="Blues")
+
+    return styler
 
 st.dataframe(
     style_dataframe(tabela),
