@@ -18,6 +18,7 @@ from streamlit_folium import st_folium
 import altair as alt
 import streamlit.components.v1 as components
 from urllib.error import HTTPError
+from branca.element import Template, MacroElement
 
 # =============================
 # Config geral
@@ -187,6 +188,7 @@ def render_lightgallery_images(items: list, height_px=420):
     components.html(html, height=height_px, scrolling=True)
 
 def make_popup_html(row):
+    # Mantida se quiser voltar para popup completo depois
     safe = lambda v: "-" if v in [None, "", np.nan] else str(v)
 
     campos = [
@@ -251,6 +253,49 @@ def make_popup_html(row):
         {corpo}
     </div>
     """
+    return html
+
+def make_photo_popup_html(row):
+    """Popup simples: apenas a foto do poço (e uma legendinha)."""
+    foto_col = "Link da Foto"
+    link = row.get(foto_col)
+
+    loc = row.get("Localidade", "")
+    bairro = row.get("Bairro", "")
+    caption_parts = [str(loc) if loc else None, str(bairro) if bairro else None]
+    caption = " • ".join([p for p in caption_parts if p])
+
+    if isinstance(link, str) and link.strip():
+        fid = gdrive_extract_id(link)
+        if fid:
+            _, big = drive_image_urls(fid)
+            img_src = big
+        else:
+            img_src = link
+
+        html = f"""
+        <div style="font-family:'Segoe UI', Tahoma, sans-serif;
+                    text-align:center;
+                    padding:6px;">
+            <div style="font-weight:600;font-size:0.9rem;margin-bottom:4px;">
+                {caption}
+            </div>
+            <img src="{img_src}"
+                 style="max-width:260px;max-height:260px;
+                        border-radius:10px;
+                        box-shadow:0 4px 14px rgba(0,0,0,.35);" />
+        </div>
+        """
+    else:
+        if not caption:
+            caption = "Poço sem foto cadastrada"
+        html = f"""
+        <div style="font-family:'Segoe UI', Tahoma, sans-serif;
+                    padding:8px;font-size:0.9rem;">
+            <strong>{caption}</strong><br>
+            Foto não disponível para este poço.
+        </div>
+        """
     return html
 
 def normaliza_lower(x):
@@ -555,18 +600,20 @@ with col_map:
     except Exception as e:
         st.warning(f"Não foi possível carregar bairros_pb.geojson: {e}")
 
-    fg_pocos = folium.FeatureGroup(name="Poços", show=True)
+    fg_pocos = folium.FeatureGroup(name="Poços (por Status)", show=True)
     pts = []
 
     lat_col = "latitude" if "latitude" in fdf.columns else None
     lon_col = "longitude" if "longitude" in fdf.columns else None
 
-    ICON_URL = "https://i.ibb.co/FqW4BJZr/rio-meidcao.png"
-    icon = CustomIcon(
-        icon_image=ICON_URL,
-        icon_size=(26, 26),
-        icon_anchor=(13, 26)
-    )
+    # Cores por Status
+    status_colors = {
+        "Instalado": "#27ae60",       # verde
+        "Não instalado": "#e67e22",   # laranja
+        "Desativado": "#7f8c8d",      # cinza
+        "Obstruído": "#c0392b",       # vermelho
+    }
+    default_color = "#2980b9"        # azul padrão
 
     if lat_col and lon_col:
         for _, row in fdf.iterrows():
@@ -575,15 +622,28 @@ with col_map:
             if lat is None or lon is None:
                 continue
 
-            popup_html = make_popup_html(row)
+            status = row.get("Status", "")
+            color = status_colors.get(str(status), default_color)
+
+            # Popup: apenas foto
+            popup_html = make_photo_popup_html(row)
             popup = folium.Popup(popup_html, max_width=320)
 
-            folium.Marker(
+            tooltip_text = str(row.get("Localidade", "Poço"))
+            if status:
+                tooltip_text += f" • {status}"
+
+            folium.CircleMarker(
                 location=[lat, lon],
-                icon=icon,
+                radius=8,
+                color=color,
+                fill=True,
+                fill_color=color,
+                fill_opacity=0.9,
                 popup=popup,
-                tooltip=str(row.get("Localidade", "Poço"))
+                tooltip=tooltip_text,
             ).add_to(fg_pocos)
+
             pts.append((lat, lon))
 
     fg_pocos.add_to(fmap)
@@ -613,6 +673,33 @@ with col_map:
             [min(p[0] for p in pts), min(p[1] for p in pts)],
             [max(p[0] for p in pts), max(p[1] for p in pts)],
         ])
+
+    # Legenda visual de Status
+    legend_html = """
+    {% macro html(this, kwargs) %}
+    <div style="
+        position: fixed;
+        bottom: 30px;
+        left: 10px;
+        z-index: 9999;
+        background-color: white;
+        padding: 8px 10px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 12px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    ">
+      <div style="font-weight:600; margin-bottom:4px;">Status dos poços</div>
+      <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#27ae60;margin-right:4px;"></span>Instalado</div>
+      <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#e67e22;margin-right:4px;"></span>Não instalado</div>
+      <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#7f8c8d;margin-right:4px;"></span>Desativado</div>
+      <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#c0392b;margin-right:4px;"></span>Obstruído</div>
+      <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#2980b9;margin-right:4px;"></span>Outros / não informado</div>
+    </div>
+    {% endmacro %}
+    """
+    legend = Template(legend_html)
+    fmap.get_root().add_child(legend)
 
     LayerControl(collapsed=True).add_to(fmap)
     st_folium(fmap, height=500, use_container_width=True)
