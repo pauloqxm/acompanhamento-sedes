@@ -675,16 +675,12 @@ with col_fotos:
     foto_col = "Link da Foto" if "Link da Foto" in fdf.columns else None
 
     # Por padrão, usa todos os poços filtrados
-fdf_gallery = fdf.copy()
+    fdf_gallery = fdf.copy()
 
-# Se o usuário clicou em um poço no mapa, tenta localizar o poço mais próximo
-if map_data and lat_col and lon_col:
-    # Prioriza clique em objeto (marcador). Se não tiver, usa clique "solto" no mapa.
-    click_info = map_data.get("last_object_clicked") or map_data.get("last_clicked")
-
-    if click_info:
-        click_lat = click_info["lat"]
-        click_lon = click_info["lng"]
+    # Se o usuário clicou em algum ponto do mapa, tenta localizar o poço mais próximo
+    if map_data and map_data.get("last_clicked") and lat_col and lon_col:
+        click_lat = map_data["last_clicked"]["lat"]
+        click_lon = map_data["last_clicked"]["lng"]
 
         tmp = fdf.copy()
         tmp["_lat"] = tmp[lat_col].apply(to_float)
@@ -696,7 +692,6 @@ if map_data and lat_col and lon_col:
             tmp = tmp.sort_values("dist2")
             # pega apenas o poço mais próximo do clique
             fdf_gallery = tmp.head(1)
-
 
     if not foto_col:
         st.info("Coluna Link da Foto não encontrada na planilha.")
