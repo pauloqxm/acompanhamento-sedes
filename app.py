@@ -12,10 +12,12 @@ from zoneinfo import ZoneInfo
 import folium
 from folium import GeoJson, GeoJsonTooltip, LayerControl
 from folium.features import CustomIcon
+from folium.plugins import HeatMap
 from streamlit_folium import st_folium
 
 import altair as alt
 import streamlit.components.v1 as components
+from urllib.error import HTTPError
 
 # =============================
 # Config geral
@@ -32,11 +34,9 @@ TZ = ZoneInfo("America/Fortaleza")
 # =============================
 st.markdown("""
 <style>
-/* Esconde menu e footer padrão para visual mais clean */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 
-/* Título da página */
 .app-header {
     background: linear-gradient(135deg, #0f4c75 0%, #3282b8 100%);
     padding: 1.8rem 2.2rem;
@@ -56,7 +56,6 @@ footer {visibility: hidden;}
     opacity: 0.92;
 }
 
-/* Badges KPI */
 .kpi-card {
     background: #ffffff;
     border-radius: 16px;
@@ -81,7 +80,6 @@ footer {visibility: hidden;}
     color: #95a5a6;
 }
 
-/* Título de bloco */
 .section-title {
     font-weight: 700;
     font-size: 1.1rem;
@@ -89,7 +87,6 @@ footer {visibility: hidden;}
     color: #2c3e50;
 }
 
-/* Dataframe mais compacto */
 [data-testid="stDataFrame"] table {
     font-size: 0.85rem;
 }
@@ -101,7 +98,15 @@ footer {visibility: hidden;}
 # =============================
 def load_from_gsheet_csv(sheet_id: str, gid: str = "0", sep: str = ","):
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
-    return pd.read_csv(url, sep=sep)
+    try:
+        df = pd.read_csv(url, sep=sep)
+    except HTTPError as e:
+        st.error(f"Erro HTTP ao acessar o Google Sheets: {e}")
+        raise
+    except Exception as e:
+        st.error(f"Erro ao ler o CSV do Google Sheets: {e}")
+        raise
+    return df
 
 def gdrive_extract_id(url: str):
     if not isinstance(url, str):
@@ -121,9 +126,6 @@ def drive_image_urls(file_id: str):
     return thumb, big
 
 def render_lightgallery_images(items: list, height_px=420):
-    """
-    items = [{ 'thumb':..., 'src':..., 'caption':... }]
-    """
     if not items:
         st.info("Nenhuma foto encontrada para os filtros atuais.")
         return
@@ -251,32 +253,43 @@ def make_popup_html(row):
     """
     return html
 
+def normaliza_lower(x):
+    if x is None:
+        return None
+    return str(x).strip().lower()
+
+def safe_sum(series):
+    return float(pd.to_numeric(series, errors="coerce").fillna(0).sum())
+
+def to_float(v):
+    if v is None:
+        return None
+    try:
+        return float(str(v).replace(",", "."))
+    except Exception:
+        return None
+
 # =============================
 # Carrega dados da planilha
 # =============================
 SHEET_ID = "12mU_58X2Ezlr_tG7pcinh1kGMY1xgXXXKfyOlXj75rc"
-GID = "1870024591"
+GID = "0"
 SEP = ","
 
 try:
     df = load_from_gsheet_csv(SHEET_ID, GID, sep=SEP)
-except Exception as e:
-    st.error(f"Erro ao carregar dados do Google Sheets: {e}")
+except Exception:
     st.stop()
 
 if df.empty:
     st.info("Planilha sem dados. Verifique permissões ou aba do Google Sheets.")
     st.stop()
 
-# Garante colunas esperadas (mesmos nomes do modelo em Excel)
-# e troca NaN por None para facilitar
 df = df.replace({np.nan: None})
 
-# Corrige tipos básicos
 if "Ano" in df.columns:
     df["Ano"] = pd.to_numeric(df["Ano"], errors="coerce").astype("Int64")
 
-# Data_visita para Year e Month
 if "Data_visita" in df.columns:
     df["_Data_dt"] = pd.to_datetime(df["Data_visita"], errors="coerce")
     df["Ano_visita"] = df["_Data_dt"].dt.year
@@ -291,14 +304,7 @@ else:
     df["Ano_visita"] = None
     df["Mes_visita"] = None
 
-# =============================
-# Correção de textos Monitorado / Instalado / Status
-# =============================
-def normaliza_lower(x):
-    if x is None:
-        return None
-    return str(x).strip().lower()
-
+# Correção de textos
 monitorado_map = {
     "sim": "Sim",
     "nao": "Não",
@@ -412,7 +418,6 @@ with col_f7:
         default=status_opts if status_opts else None
     )
 
-# Aplica filtros
 fdf = df.copy()
 
 if anos and ano_sel:
@@ -446,9 +451,6 @@ st.markdown(
 st.markdown("### Indicadores principais")
 
 k1, k2, k3, k4 = st.columns(4)
-
-def safe_sum(series):
-    return float(pd.to_numeric(series, errors="coerce").fillna(0).sum())
 
 total_pocos = len(fdf[fdf["Localidade"].notna()]) if "Localidade" in fdf.columns else len(fdf)
 total_vazao = safe_sum(fdf["Vazão_LH"]) if "Vazão_LH" in fdf.columns else 0
@@ -523,7 +525,6 @@ with col_map:
         tiles=None
     )
 
-    # Camadas base
     folium.TileLayer("CartoDB Positron", name="CartoDB Positron").add_to(fmap)
     folium.TileLayer("OpenStreetMap", name="OpenStreetMap").add_to(fmap)
     folium.TileLayer(
@@ -560,14 +561,6 @@ with col_map:
     lat_col = "latitude" if "latitude" in fdf.columns else None
     lon_col = "longitude" if "longitude" in fdf.columns else None
 
-    def to_float(v):
-        if v is None:
-            return None
-        try:
-            return float(str(v).replace(",", "."))
-        except Exception:
-            return None
-
     ICON_URL = "https://i.ibb.co/FqW4BJZr/rio-meidcao.png"
     icon = CustomIcon(
         icon_image=ICON_URL,
@@ -577,8 +570,8 @@ with col_map:
 
     if lat_col and lon_col:
         for _, row in fdf.iterrows():
-            lat = to_float(row[lat_col])
-            lon = to_float(row[lon_col])
+            lat = to_float(row.get(lat_col))
+            lon = to_float(row.get(lon_col))
             if lat is None or lon is None:
                 continue
 
@@ -594,15 +587,34 @@ with col_map:
             pts.append((lat, lon))
 
     fg_pocos.add_to(fmap)
-    LayerControl(collapsed=True).add_to(fmap)
 
-    # Ajusta bounds se tiver pontos
+    # Heatmap da Vazão_LH
+    if "Vazão_LH" in fdf.columns and lat_col and lon_col:
+        heat_df = fdf[[lat_col, lon_col, "Vazão_LH"]].copy()
+        heat_df["lat"] = heat_df[lat_col].apply(to_float)
+        heat_df["lon"] = heat_df[lon_col].apply(to_float)
+        heat_df["val"] = pd.to_numeric(heat_df["Vazão_LH"], errors="coerce")
+
+        heat_df = heat_df.dropna(subset=["lat", "lon", "val"])
+
+        if not heat_df.empty:
+            heat_points = heat_df[["lat", "lon", "val"]].values.tolist()
+            fg_heat = folium.FeatureGroup(name="Mapa de calor Vazão_LH", show=False)
+            HeatMap(
+                heat_points,
+                radius=22,
+                blur=18,
+                max_zoom=12,
+            ).add_to(fg_heat)
+            fg_heat.add_to(fmap)
+
     if pts:
         fmap.fit_bounds([
             [min(p[0] for p in pts), min(p[1] for p in pts)],
             [max(p[0] for p in pts), max(p[1] for p in pts)],
         ])
 
+    LayerControl(collapsed=True).add_to(fmap)
     st_folium(fmap, height=500, use_container_width=True)
 
 with col_fotos:
@@ -703,7 +715,6 @@ cols_existentes = [c for c in cols_tabela if c in fdf.columns]
 
 tabela = fdf[cols_existentes].copy()
 
-# Formata numéricos principais
 for col in ["Vazão_LH", "Vazão_estimada_LH", "Cloretos"]:
     if col in tabela.columns:
         tabela[col] = pd.to_numeric(tabela[col], errors="coerce")
@@ -719,4 +730,3 @@ st.markdown("""
   Painel em construção permanente. Use os filtros para explorar cenários e apoiar decisões sobre os poços de Pedra Branca.
 </div>
 """, unsafe_allow_html=True)
-
