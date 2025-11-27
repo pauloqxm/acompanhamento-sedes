@@ -240,6 +240,7 @@ def drive_image_urls(file_id: str):
     big = f"https://drive.google.com/thumbnail?id={file_id}&sz=w2048"
     return thumb, big
 
+# ⬇️ Galeria no modelo antigo
 def render_lightgallery_images(items: list, height_px=420):
     if not items:
         st.info("📷 Nenhuma foto encontrada para os filtros atuais.")
@@ -257,31 +258,25 @@ def render_lightgallery_images(items: list, height_px=420):
     items_html = "\n".join(anchors)
 
     html = f"""
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@2.7.2/lightgallery-bundle.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@2.7.2/css/lightgallery-bundle.min.css">
     <style>
-      .lg-backdrop {{ background: rgba(0,0,0,0.95); }}
+      .lg-backdrop {{ background: rgba(0,0,0,0.92); }}
       .gallery-container {{
           display:flex;
           flex-wrap:wrap;
           gap: 12px;
           align-items:flex-start;
-          justify-content:center;
-      }}
-      .gallery-item {{
-          border-radius: 16px;
-          overflow: hidden;
-          transition: all 0.3s ease;
       }}
       .gallery-item img {{
-          height: 140px;
+          height: 120px;
           width:auto;
-          border-radius: 16px;
-          box-shadow: 0 6px 20px rgba(0,0,0,.2);
-          transition: transform 0.3s ease, box-shadow 0.3s ease;
+          border-radius: 12px;
+          box-shadow: 0 4px 12px rgba(0,0,0,.25);
+          transition: transform 0.25s ease, box-shadow 0.25s ease;
       }}
       .gallery-item:hover img {{
-          transform: scale(1.08);
-          box-shadow: 0 12px 28px rgba(0,0,0,.35);
+          transform: scale(1.04);
+          box-shadow: 0 6px 18px rgba(0,0,0,.32);
       }}
     </style>
     <div id="lg-gallery" class="gallery-container">{items_html}</div>
@@ -771,9 +766,10 @@ with col_map:
                 [max(p[0] for p in pts), max(p[1] for p in pts)],
             ])
 
+        # Legenda com opção de recolher
         legend_html = """
         {% macro html(this, kwargs) %}
-        <div style="
+        <div id="legend-pocos" style="
             position: fixed;
             bottom: 40px;
             left: 10px;
@@ -787,13 +783,39 @@ with col_map:
             backdrop-filter: blur(10px);
             font-family: 'Segoe UI', system-ui, sans-serif;
         ">
-          <div style="font-weight:700; margin-bottom:8px; color:#2d3436; font-size:13px;">Status dos Poços</div>
-          <div style="display:flex;align-items:center;margin-bottom:4px;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#00b894;margin-right:6px;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>Instalado</div>
-          <div style="display:flex;align-items:center;margin-bottom:4px;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#e17055;margin-right:6px;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>Não instalado</div>
-          <div style="display:flex;align-items:center;margin-bottom:4px;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#636e72;margin-right:6px;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>Desativado</div>
-          <div style="display:flex;align-items:center;margin-bottom:4px;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#d63031;margin-right:6px;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>Obstruído</div>
-          <div style="display:flex;align-items:center;margin-bottom:4px;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#6c5ce7;margin-right:6px;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>Injetado</div>
-          <div style="display:flex;align-items:center;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#0984e3;margin-right:6px;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>Outros</div>
+          <div id="legend-pocos-header" style="font-weight:700; margin-bottom:6px; color:#2d3436; font-size:13px; cursor:pointer;"
+               onclick="
+                 var body = document.getElementById('legend-pocos-body');
+                 if (body.style.display === 'none') {{
+                     body.style.display = 'block';
+                     this.innerHTML = 'Status dos Poços ▾';
+                 }} else {{
+                     body.style.display = 'none';
+                     this.innerHTML = 'Status dos Poços ▸';
+                 }}
+               ">
+            Status dos Poços ▾
+          </div>
+          <div id="legend-pocos-body" style="margin-top:4px;">
+            <div style="display:flex;align-items:center;margin-bottom:4px;">
+              <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#00b894;margin-right:6px;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>Instalado
+            </div>
+            <div style="display:flex;align-items:center;margin-bottom:4px;">
+              <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#e17055;margin-right:6px;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>Não instalado
+            </div>
+            <div style="display:flex;align-items:center;margin-bottom:4px;">
+              <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#636e72;margin-right:6px;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>Desativado
+            </div>
+            <div style="display:flex;align-items:center;margin-bottom:4px;">
+              <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#d63031;margin-right:6px;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>Obstruído
+            </div>
+            <div style="display:flex;align-items:center;margin-bottom:4px;">
+              <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#6c5ce7;margin-right:6px;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>Injetado
+            </div>
+            <div style="display:flex;align-items:center;">
+              <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#0984e3;margin-right:6px;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></span>Outros
+            </div>
+          </div>
         </div>
         {% endmacro %}
         """
@@ -801,7 +823,8 @@ with col_map:
         legend._template = Template(legend_html)
         fmap.get_root().add_child(legend)
 
-        LayerControl(collapsed=False).add_to(fmap)
+        # ⬇️ Botão de camadas recolhido (apenas ícone)
+        LayerControl(collapsed=True).add_to(fmap)
 
         map_data = st_folium(fmap, height=500, use_container_width=True)
 
@@ -938,22 +961,12 @@ for col in ["Vazão_LH", "Vazão_estimada_LH", "Cloretos"]:
     if col in tabela.columns:
         tabela[col] = pd.to_numeric(tabela[col], errors="coerce")
 
-def style_dataframe(df: pd.DataFrame):
-    format_dict = {}
-    if "Vazão_LH" in df.columns:
-        format_dict["Vazão_LH"] = "{:,.0f} L/h"
-    if "Vazão_estimada_LH" in df.columns:
-        format_dict["Vazão_estimada_LH"] = "{:,.0f} L/h"
-    if "Cloretos" in df.columns:
-        format_dict["Cloretos"] = "{:.2f}"
-
-    styler = df.style.format(format_dict, na_rep="-")
-
-    subset_cols = [c for c in ["Vazão_LH", "Vazão_estimada_LH"] if c in df.columns]
-    if subset_cols:
-        styler = styler.background_gradient(subset=subset_cols, cmap="Blues")
-
-    return styler
+def style_dataframe(df):
+    return df.style.format({
+        'Vazão_LH': '{:,.0f} L/h',
+        'Vazão_estimada_LH': '{:,.0f} L/h',
+        'Cloretos': '{:.2f}'
+    }, na_rep="-").background_gradient(subset=['Vazão_LH', 'Vazão_estimada_LH'], cmap='Blues')
 
 st.dataframe(
     style_dataframe(tabela),
