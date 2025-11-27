@@ -3,6 +3,7 @@ pandas
 numpy
 altair
 folium
+streamlit-folium
 branca
 python-dateutil
 zoneinfo;python_version<"3.9"
