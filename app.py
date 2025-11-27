@@ -834,12 +834,16 @@ with col_fotos:
     with st.container():
         foto_col = "Link da Foto" if "Link da Foto" in fdf.columns else None
 
+        # Começa com o dataframe filtrado geral
         fdf_gallery = fdf.copy()
+        clicked = False
 
+        # Se houve clique no mapa, pega o poço mais próximo do clique
         if map_data and lat_col and lon_col:
             click_info = map_data.get("last_object_clicked") or map_data.get("last_clicked")
 
             if click_info:
+                clicked = True
                 click_lat = click_info["lat"]
                 click_lon = click_info["lng"]
 
@@ -858,6 +862,7 @@ with col_fotos:
         else:
             items = []
             vistos = set()
+
             for _, row in fdf_gallery.iterrows():
                 link = row.get(foto_col)
                 if not isinstance(link, str) or not link.strip():
@@ -878,12 +883,19 @@ with col_fotos:
                 else:
                     items.append({"thumb": link, "src": link, "caption": caption})
 
-            if map_data and (map_data.get("last_object_clicked") or map_data.get("last_clicked")):
+            # Decide se abre automaticamente a galeria
+            if clicked and items:
                 st.success("📍 Visualizando fotos do poço selecionado no mapa")
+                auto_open = True
             else:
-                st.info("🗺️ Clique em um poço no mapa para ver fotos específicas")
+                if not items:
+                    st.info("🗺️ Clique em um poço no mapa para ver fotos específicas")
+                else:
+                    st.info("🗺️ Clique em um poço no mapa para focar as fotos em um ponto específico")
+                auto_open = False
 
-            render_lightgallery_images(items, height_px=460)
+            render_lightgallery_images(items, height_px=460, auto_open=auto_open)
+
 
 # =============================
 # Gráficos Modernizados
