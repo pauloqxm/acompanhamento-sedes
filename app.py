@@ -631,7 +631,7 @@ with col_map:
             [max(p[0] for p in pts), max(p[1] for p in pts)],
         ])
 
-    # Legenda visual de Status
+        # Legenda visual de Status
     legend_html = """
     {% macro html(this, kwargs) %}
     <div style="
@@ -655,8 +655,11 @@ with col_map:
     </div>
     {% endmacro %}
     """
-    legend = Template(legend_html)
+
+    legend = MacroElement()
+    legend._template = Template(legend_html)
     fmap.get_root().add_child(legend)
+
 
     LayerControl(collapsed=True).add_to(fmap)
 
