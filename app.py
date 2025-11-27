@@ -631,7 +631,7 @@ with col_map:
             [max(p[0] for p in pts), max(p[1] for p in pts)],
         ])
 
-        # Legenda visual de Status
+    # Legenda visual de Status
     legend_html = """
     {% macro html(this, kwargs) %}
     <div style="
@@ -655,15 +655,13 @@ with col_map:
     </div>
     {% endmacro %}
     """
-
     legend = MacroElement()
     legend._template = Template(legend_html)
     fmap.get_root().add_child(legend)
 
-
     LayerControl(collapsed=True).add_to(fmap)
 
-    # CAPTURA DO CLICK NO MAPA
+    # CAPTURA DO CLICK NO MAPA (objeto ou mapa)
     map_data = st_folium(fmap, height=500, use_container_width=True)
 
 # =============================
@@ -677,21 +675,25 @@ with col_fotos:
     # Por padrão, usa todos os poços filtrados
     fdf_gallery = fdf.copy()
 
-    # Se o usuário clicou em algum ponto do mapa, tenta localizar o poço mais próximo
-    if map_data and map_data.get("last_clicked") and lat_col and lon_col:
-        click_lat = map_data["last_clicked"]["lat"]
-        click_lon = map_data["last_clicked"]["lng"]
+    # Se o usuário clicou em um poço no mapa, tenta localizar o poço mais próximo
+    if map_data and lat_col and lon_col:
+        # Prioriza clique em objeto (marcador). Se não tiver, usa clique solto no mapa.
+        click_info = map_data.get("last_object_clicked") or map_data.get("last_clicked")
 
-        tmp = fdf.copy()
-        tmp["_lat"] = tmp[lat_col].apply(to_float)
-        tmp["_lon"] = tmp[lon_col].apply(to_float)
-        tmp = tmp.dropna(subset=["_lat", "_lon"])
+        if click_info:
+            click_lat = click_info["lat"]
+            click_lon = click_info["lng"]
 
-        if not tmp.empty:
-            tmp["dist2"] = (tmp["_lat"] - click_lat) ** 2 + (tmp["_lon"] - click_lon) ** 2
-            tmp = tmp.sort_values("dist2")
-            # pega apenas o poço mais próximo do clique
-            fdf_gallery = tmp.head(1)
+            tmp = fdf.copy()
+            tmp["_lat"] = tmp[lat_col].apply(to_float)
+            tmp["_lon"] = tmp[lon_col].apply(to_float)
+            tmp = tmp.dropna(subset=["_lat", "_lon"])
+
+            if not tmp.empty:
+                tmp["dist2"] = (tmp["_lat"] - click_lat) ** 2 + (tmp["_lon"] - click_lon) ** 2
+                tmp = tmp.sort_values("dist2")
+                # pega apenas o poço mais próximo do clique
+                fdf_gallery = tmp.head(1)
 
     if not foto_col:
         st.info("Coluna Link da Foto não encontrada na planilha.")
@@ -718,7 +720,7 @@ with col_fotos:
             else:
                 items.append({"thumb": link, "src": link, "caption": caption})
 
-        if map_data and map_data.get("last_clicked"):
+        if map_data and (map_data.get("last_object_clicked") or map_data.get("last_clicked")):
             st.caption("Exibindo fotos do poço selecionado no mapa.")
         else:
             st.caption("Clique em um poço no mapa para ver apenas as fotos daquele ponto.")
