@@ -541,14 +541,14 @@ with st.expander("Filtros de Pesquisa", expanded=True):
     with col_f5:
         mon_opts = sorted([m for m in df["Monitorado"].dropna().unique().tolist()]) if "Monitorado" in df.columns else []
         mon_sel = st.multiselect(
-            "📡 Monitorado",
+            "📡 Monitorado pela COGERH",
             options=mon_opts,
             default=mon_opts if mon_opts else None
         )
     with col_f6:
         inst_opts = sorted([m for m in df["Instalado"].dropna().unique().tolist()]) if "Instalado" in df.columns else []
         inst_sel = st.multiselect(
-            "⚙️ Instalado",
+            "⚙️ Instalado/Estado",
             options=inst_opts,
             default=inst_opts if inst_opts else None
         )
