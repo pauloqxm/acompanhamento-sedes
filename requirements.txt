@@ -6,4 +6,4 @@ folium
 streamlit-folium
 branca
 python-dateutil
-zoneinfo;python_version<"3.9"
+zoneinfo; python_version<"3.9"
