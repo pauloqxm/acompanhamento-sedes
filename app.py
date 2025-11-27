@@ -11,13 +11,13 @@ from zoneinfo import ZoneInfo
 
 import folium
 from folium import GeoJson, GeoJsonTooltip, LayerControl
-from folium.features import CustomIcon
 from folium.plugins import HeatMap
 from streamlit_folium import st_folium
 
 import altair as alt
 import streamlit.components.v1 as components
 from urllib.error import HTTPError
+from branca.element import Template, MacroElement
 
 # =============================
 # Config geral
@@ -445,6 +445,10 @@ st.markdown(
     f"Registros após filtros: **{len(fdf)}** poços."
 )
 
+# Colunas de coordenadas (compartilhadas entre mapa e galeria)
+lat_col = "latitude" if "latitude" in fdf.columns else None
+lon_col = "longitude" if "longitude" in fdf.columns else None
+
 # =============================
 # KPIs
 # =============================
@@ -515,6 +519,8 @@ with k4:
 st.markdown("---")
 col_map, col_fotos = st.columns([1.2, 1])
 
+map_data = None
+
 with col_map:
     st.markdown('<div class="section-title">🗺️ Mapa dos poços</div>', unsafe_allow_html=True)
 
@@ -555,18 +561,17 @@ with col_map:
     except Exception as e:
         st.warning(f"Não foi possível carregar bairros_pb.geojson: {e}")
 
-    fg_pocos = folium.FeatureGroup(name="Poços", show=True)
+    fg_pocos = folium.FeatureGroup(name="Poços (por Status)", show=True)
     pts = []
 
-    lat_col = "latitude" if "latitude" in fdf.columns else None
-    lon_col = "longitude" if "longitude" in fdf.columns else None
-
-    ICON_URL = "https://i.ibb.co/FqW4BJZr/rio-meidcao.png"
-    icon = CustomIcon(
-        icon_image=ICON_URL,
-        icon_size=(26, 26),
-        icon_anchor=(13, 26)
-    )
+    # Cores por Status
+    status_colors = {
+        "Instalado": "#27ae60",       # verde
+        "Não instalado": "#e67e22",   # laranja
+        "Desativado": "#7f8c8d",      # cinza
+        "Obstruído": "#c0392b",       # vermelho
+    }
+    default_color = "#2980b9"        # azul padrão
 
     if lat_col and lon_col:
         for _, row in fdf.iterrows():
@@ -575,15 +580,27 @@ with col_map:
             if lat is None or lon is None:
                 continue
 
+            status = row.get("Status", "")
+            color = status_colors.get(str(status), default_color)
+
             popup_html = make_popup_html(row)
             popup = folium.Popup(popup_html, max_width=320)
 
-            folium.Marker(
+            tooltip_text = str(row.get("Localidade", "Poço"))
+            if status:
+                tooltip_text += f" • {status}"
+
+            folium.CircleMarker(
                 location=[lat, lon],
-                icon=icon,
+                radius=8,
+                color=color,
+                fill=True,
+                fill_color=color,
+                fill_opacity=0.9,
                 popup=popup,
-                tooltip=str(row.get("Localidade", "Poço"))
+                tooltip=tooltip_text,
             ).add_to(fg_pocos)
+
             pts.append((lat, lon))
 
     fg_pocos.add_to(fmap)
@@ -614,19 +631,71 @@ with col_map:
             [max(p[0] for p in pts), max(p[1] for p in pts)],
         ])
 
-    LayerControl(collapsed=True).add_to(fmap)
-    st_folium(fmap, height=500, use_container_width=True)
+    # Legenda visual de Status
+    legend_html = """
+    {% macro html(this, kwargs) %}
+    <div style="
+        position: fixed;
+        bottom: 30px;
+        left: 10px;
+        z-index: 9999;
+        background-color: white;
+        padding: 8px 10px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 12px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    ">
+      <div style="font-weight:600; margin-bottom:4px;">Status dos poços</div>
+      <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#27ae60;margin-right:4px;"></span>Instalado</div>
+      <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#e67e22;margin-right:4px;"></span>Não instalado</div>
+      <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#7f8c8d;margin-right:4px;"></span>Desativado</div>
+      <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#c0392b;margin-right:4px;"></span>Obstruído</div>
+      <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#2980b9;margin-right:4px;"></span>Outros / não informado</div>
+    </div>
+    {% endmacro %}
+    """
+    legend = Template(legend_html)
+    fmap.get_root().add_child(legend)
 
+    LayerControl(collapsed=True).add_to(fmap)
+
+    # CAPTURA DO CLICK NO MAPA
+    map_data = st_folium(fmap, height=500, use_container_width=True)
+
+# =============================
+# Galeria de fotos (ligada ao clique do mapa)
+# =============================
 with col_fotos:
     st.markdown('<div class="section-title">📸 Fotos dos poços</div>', unsafe_allow_html=True)
 
     foto_col = "Link da Foto" if "Link da Foto" in fdf.columns else None
+
+    # Por padrão, usa todos os poços filtrados
+    fdf_gallery = fdf.copy()
+
+    # Se o usuário clicou em algum ponto do mapa, tenta localizar o poço mais próximo
+    if map_data and map_data.get("last_clicked") and lat_col and lon_col:
+        click_lat = map_data["last_clicked"]["lat"]
+        click_lon = map_data["last_clicked"]["lng"]
+
+        tmp = fdf.copy()
+        tmp["_lat"] = tmp[lat_col].apply(to_float)
+        tmp["_lon"] = tmp[lon_col].apply(to_float)
+        tmp = tmp.dropna(subset=["_lat", "_lon"])
+
+        if not tmp.empty:
+            tmp["dist2"] = (tmp["_lat"] - click_lat) ** 2 + (tmp["_lon"] - click_lon) ** 2
+            tmp = tmp.sort_values("dist2")
+            # pega apenas o poço mais próximo do clique
+            fdf_gallery = tmp.head(1)
+
     if not foto_col:
         st.info("Coluna Link da Foto não encontrada na planilha.")
     else:
         items = []
         vistos = set()
-        for _, row in fdf.iterrows():
+        for _, row in fdf_gallery.iterrows():
             link = row.get(foto_col)
             if not isinstance(link, str) or not link.strip():
                 continue
@@ -645,6 +714,11 @@ with col_fotos:
                 items.append({"thumb": thumb, "src": big, "caption": caption})
             else:
                 items.append({"thumb": link, "src": link, "caption": caption})
+
+        if map_data and map_data.get("last_clicked"):
+            st.caption("Exibindo fotos do poço selecionado no mapa.")
+        else:
+            st.caption("Clique em um poço no mapa para ver apenas as fotos daquele ponto.")
 
         render_lightgallery_images(items, height_px=460)
 
