@@ -255,7 +255,7 @@ def make_popup_html(row):
 # Carrega dados da planilha
 # =============================
 SHEET_ID = "12mU_58X2Ezlr_tG7pcinh1kGMY1xgXXXKfyOlXj75rc"
-GID = "0"
+GID = "1870024591"
 SEP = ","
 
 try:
