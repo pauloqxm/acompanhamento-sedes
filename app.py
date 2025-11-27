@@ -240,8 +240,8 @@ def drive_image_urls(file_id: str):
     big = f"https://drive.google.com/thumbnail?id={file_id}&sz=w2048"
     return thumb, big
 
-# ⬇️ Galeria no modelo antigo
-def render_lightgallery_images(items: list, height_px=420):
+# ⬇️ Galeria no modelo antigo, com auto_open
+def render_lightgallery_images(items: list, height_px=420, auto_open: bool = False):
     if not items:
         st.info("📷 Nenhuma foto encontrada para os filtros atuais.")
         return
@@ -256,6 +256,13 @@ def render_lightgallery_images(items: list, height_px=420):
             """
         )
     items_html = "\n".join(anchors)
+
+    auto_open_js = """
+        const firstItem = container.querySelector('.gallery-item');
+        if (firstItem) {
+          firstItem.click();
+        }
+    """ if auto_open else ""
 
     html = f"""
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@2.7.2/css/lightgallery-bundle.min.css">
@@ -289,7 +296,7 @@ def render_lightgallery_images(items: list, height_px=420):
       window.addEventListener('load', () => {{
         const container = document.getElementById('lg-gallery');
         if (!container) return;
-        lightGallery(container, {{
+        const lgInstance = lightGallery(container, {{
           selector: '.gallery-item',
           zoom: true,
           thumbnail: true,
@@ -297,6 +304,7 @@ def render_lightgallery_images(items: list, height_px=420):
           loop: true,
           plugins: [lgZoom, lgThumbnail]
         }});
+        {auto_open_js}
       }});
     </script>
     """
@@ -839,9 +847,8 @@ with col_fotos:
         clicked = False
 
         # Se houve clique no mapa, pega o poço mais próximo do clique
-        if map_data and lat_col and lon_col:
+        if map_data and 'last_object_clicked' in map_data and lat_col and lon_col:
             click_info = map_data.get("last_object_clicked") or map_data.get("last_clicked")
-
             if click_info:
                 clicked = True
                 click_lat = click_info["lat"]
@@ -895,7 +902,6 @@ with col_fotos:
                 auto_open = False
 
             render_lightgallery_images(items, height_px=460, auto_open=auto_open)
-
 
 # =============================
 # Gráficos Modernizados
