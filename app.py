@@ -321,7 +321,8 @@ status_map = {
     "não_instalado": "Não instalado",
     "desativado": "Desativado",
     "obstruido": "Obstruído",
-    "obstruído": "Obstruído"
+    "obstruído": "Obstruído",
+    "injetado": "Injetado",
 }
 
 if "Monitorado" in df.columns:
@@ -564,12 +565,13 @@ with col_map:
     fg_pocos = folium.FeatureGroup(name="Poços (por Status)", show=True)
     pts = []
 
-    # Cores por Status
+    # Cores por Status (inclui Injetado)
     status_colors = {
         "Instalado": "#27ae60",       # verde
         "Não instalado": "#e67e22",   # laranja
         "Desativado": "#7f8c8d",      # cinza
         "Obstruído": "#c0392b",       # vermelho
+        "Injetado": "#8e44ad",        # roxo
     }
     default_color = "#2980b9"        # azul padrão
 
@@ -631,7 +633,7 @@ with col_map:
             [max(p[0] for p in pts), max(p[1] for p in pts)],
         ])
 
-    # Legenda visual de Status
+    # Legenda visual de Status (inclui Injetado)
     legend_html = """
     {% macro html(this, kwargs) %}
     <div style="
@@ -651,6 +653,7 @@ with col_map:
       <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#e67e22;margin-right:4px;"></span>Não instalado</div>
       <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#7f8c8d;margin-right:4px;"></span>Desativado</div>
       <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#c0392b;margin-right:4px;"></span>Obstruído</div>
+      <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#8e44ad;margin-right:4px;"></span>Injetado</div>
       <div><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#2980b9;margin-right:4px;"></span>Outros / não informado</div>
     </div>
     {% endmacro %}
