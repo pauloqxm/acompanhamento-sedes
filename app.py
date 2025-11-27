@@ -786,13 +786,13 @@ with col_map:
           <div id="legend-pocos-header" style="font-weight:700; margin-bottom:6px; color:#2d3436; font-size:13px; cursor:pointer;"
                onclick="
                  var body = document.getElementById('legend-pocos-body');
-                 if (body.style.display === 'none') {{
+                 if (body.style.display === 'none') {
                      body.style.display = 'block';
                      this.innerHTML = 'Status dos Poços ▾';
-                 }} else {{
+                 } else {
                      body.style.display = 'none';
                      this.innerHTML = 'Status dos Poços ▸';
-                 }}
+                 }
                ">
             Status dos Poços ▾
           </div>
