@@ -209,7 +209,7 @@ footer {visibility: hidden;}
 """, unsafe_allow_html=True)
 
 # =============================
-# Funções auxiliares (mantidas as originais com pequenos ajustes)
+# Funções auxiliares
 # =============================
 def load_from_gsheet_csv(sheet_id: str, gid: str = "0", sep: str = ","):
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
@@ -257,7 +257,7 @@ def render_lightgallery_images(items: list, height_px=420):
     items_html = "\n".join(anchors)
 
     html = f"""
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@2.7.2/css/lightgallery-bundle.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@2.7.2/lightgallery-bundle.min.css">
     <style>
       .lg-backdrop {{ background: rgba(0,0,0,0.95); }}
       .gallery-container {{
@@ -421,7 +421,7 @@ with col_info3:
         st.rerun()
 
 # =============================
-# Carrega dados (mantido igual)
+# Carrega dados
 # =============================
 SHEET_ID = "12mU_58X2Ezlr_tG7pcinh1kGMY1xgXXXKfyOlXj75rc"
 GID = "1870024591"
@@ -436,8 +436,6 @@ except Exception:
 if df.empty:
     st.info("📋 Planilha sem dados disponíveis.")
     st.stop()
-
-# ... (restante do processamento de dados igual ao original)
 
 df = df.replace({np.nan: None})
 
@@ -559,7 +557,7 @@ with st.expander("Filtros de Pesquisa", expanded=True):
             default=status_opts if status_opts else None
         )
 
-# Aplicação dos filtros (igual ao original)
+# Aplicação dos filtros
 fdf = df.copy()
 
 if anos and ano_sel:
@@ -648,7 +646,7 @@ with k4:
     )
 
 # =============================
-# Layout Mapa + Fotos Modernizado
+# Layout Mapa + Fotos
 # =============================
 st.markdown("---")
 st.markdown('<div class="section-title">🗺️ Visualização Geográfica</div>', unsafe_allow_html=True)
@@ -660,7 +658,6 @@ map_data = None
 with col_map:
     st.markdown("#### Mapa Interativo dos Poços")
     
-    # Container do mapa com borda moderna
     with st.container():
         fmap = folium.Map(
             location=[-5.45, -39.7],
@@ -677,7 +674,7 @@ with col_map:
             attr="Tiles © Esri"
         ).add_to(fmap)
 
-        # Camada bairros (estilo modernizado)
+        # Camada bairros
         try:
             with open("bairros_pb.geojson", "r", encoding="utf-8") as f:
                 bairros = json.load(f)
@@ -702,15 +699,14 @@ with col_map:
         fg_pocos = folium.FeatureGroup(name="Poços (Status)", show=True)
         pts = []
 
-        # Cores modernizadas para status
         status_colors = {
-            "Instalado": "#00b894",       # verde esmeralda
-            "Não instalado": "#e17055",   # laranja coral
-            "Desativado": "#636e72",      # cinza grafite
-            "Obstruído": "#d63031",       # vermelho vibrante
-            "Injetado": "#6c5ce7",        # roxo elétrico
+            "Instalado": "#00b894",
+            "Não instalado": "#e17055",
+            "Desativado": "#636e72",
+            "Obstruído": "#d63031",
+            "Injetado": "#6c5ce7",
         }
-        default_color = "#0984e3"         # azul moderno
+        default_color = "#0984e3"
 
         lat_col = "latitude" if "latitude" in fdf.columns else None
         lon_col = "longitude" if "longitude" in fdf.columns else None
@@ -748,7 +744,7 @@ with col_map:
 
         fg_pocos.add_to(fmap)
 
-        # Heatmap (estilo modernizado)
+        # Heatmap
         if "Vazão_LH" in fdf.columns and lat_col and lon_col:
             heat_df = fdf[[lat_col, lon_col, "Vazão_LH"]].copy()
             heat_df["lat"] = heat_df[lat_col].apply(to_float)
@@ -775,7 +771,6 @@ with col_map:
                 [max(p[0] for p in pts), max(p[1] for p in pts)],
             ])
 
-        # Legenda moderna
         legend_html = """
         {% macro html(this, kwargs) %}
         <div style="
@@ -890,7 +885,6 @@ def barra_contagem_moderna(colname, titulo, col_container):
             st.info(f"📊 Sem dados de {titulo} para os filtros atuais")
         return
 
-    # Cores modernas para diferentes categorias
     color_schemes = {
         "Monitorado": ["#74b9ff", "#0984e3", "#6c5ce7"],
         "Instalado": ["#00b894", "#00cec9", "#55efc4"],
@@ -944,13 +938,22 @@ for col in ["Vazão_LH", "Vazão_estimada_LH", "Cloretos"]:
     if col in tabela.columns:
         tabela[col] = pd.to_numeric(tabela[col], errors="coerce")
 
-# Estilização da tabela
-def style_dataframe(df):
-    return df.style.format({
-        'Vazão_LH': '{:,.0f} L/h',
-        'Vazão_estimada_LH': '{:,.0f} L/h',
-        'Cloretos': '{:.2f}'
-    }, na_rep="-").background_gradient(subset=['Vazão_LH', 'Vazão_estimada_LH'], cmap='Blues')
+def style_dataframe(df: pd.DataFrame):
+    format_dict = {}
+    if "Vazão_LH" in df.columns:
+        format_dict["Vazão_LH"] = "{:,.0f} L/h"
+    if "Vazão_estimada_LH" in df.columns:
+        format_dict["Vazão_estimada_LH"] = "{:,.0f} L/h"
+    if "Cloretos" in df.columns:
+        format_dict["Cloretos"] = "{:.2f}"
+
+    styler = df.style.format(format_dict, na_rep="-")
+
+    subset_cols = [c for c in ["Vazão_LH", "Vazão_estimada_LH"] if c in df.columns]
+    if subset_cols:
+        styler = styler.background_gradient(subset=subset_cols, cmap="Blues")
+
+    return styler
 
 st.dataframe(
     style_dataframe(tabela),
