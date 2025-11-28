@@ -1025,29 +1025,46 @@ def barra_contagem_moderna(colname, titulo, col_container):
     }
     colors = color_schemes.get(colname, ["#74b9ff", "#0984e3"])
 
-    # Caso especial: Status x Ano_visita
+    # Caso especial: Status x Ano_visita (contando poços únicos por ano)
     if colname == "Status" and "Ano_visita" in fdf.columns:
-        tmp = (
-            fdf[["Ano_visita", colname]]
-            .dropna(subset=["Ano_visita", colname])
-            .groupby(["Ano_visita", colname])
+        # Monta colunas necessárias
+        cols = ["Ano_visita", colname]
+        if "Latitude_2" in fdf.columns:
+            cols.append("Latitude_2")
+
+        tmp = fdf[cols].dropna(subset=["Ano_visita", colname]).copy()
+
+        # Se existir Latitude_2, garante que cada poço (Latitude_2) conte no máximo 1 vez por ano
+        if "Latitude_2" in tmp.columns:
+            non_null = (
+                tmp[tmp["Latitude_2"].notna()]
+                .drop_duplicates(subset=["Ano_visita", "Latitude_2"])
+                .copy()
+            )
+            null_part = tmp[tmp["Latitude_2"].isna()].copy()
+            tmp = pd.concat([non_null, null_part], ignore_index=True)
+
+        # Agora sim, agrupa por ano e status
+        tmp_grouped = (
+            tmp.groupby(["Ano_visita", colname])
             .size()
             .reset_index(name="contagem")
         )
-        if tmp.empty:
+
+        if tmp_grouped.empty:
             with col_container:
                 st.info(f"📊 Sem dados de {titulo} para os filtros atuais")
             return
 
-        # Totais por ano para exibir no topo
+        # Totais por ano para exibir no topo (já considerando não repetidos)
         totais = (
-            tmp.groupby("Ano_visita")["contagem"]
+            tmp_grouped.groupby("Ano_visita")["contagem"]
             .sum()
             .reset_index(name="total")
         )
 
         bars = (
-            alt.Chart(tmp)
+            alt.Chart(tmp_grouped)
             .mark_bar(cornerRadius=6)
             .encode(
                 x=alt.X("Ano_visita:O", title="Ano da visita"),
@@ -1087,7 +1104,9 @@ def barra_contagem_moderna(colname, titulo, col_container):
             .configure_axis(labelFont="Segoe UI", titleFont="Segoe UI")
             .configure_legend(labelFont="Segoe UI", titleFont="Segoe UI")
         )
+
     else:
+        # Demais gráficos: contagem simples
         tmp = (
             fdf[[colname]]
             .dropna()
@@ -1125,56 +1144,6 @@ def barra_contagem_moderna(colname, titulo, col_container):
     with col_container:
         st.altair_chart(chart, use_container_width=True)
 
-def grafico_caixas_por_ano(col_container):
-    """Gráfico de Caixas de apoio por ano da visita."""
-    if "Caixas_apoio" not in fdf.columns or "Ano_visita" not in fdf.columns:
-        with col_container:
-            st.info("📋 Dados de Caixas de apoio por ano não disponíveis")
-        return
-
-    tmp = (
-        fdf[["Ano_visita", "Caixas_apoio"]]
-        .dropna(subset=["Ano_visita", "Caixas_apoio"])
-        .copy()
-    )
-
-    if tmp.empty:
-        with col_container:
-            st.info("📊 Sem dados de Caixas de apoio para os filtros atuais")
-        return
-
-    tmp["Caixas_apoio"] = pd.to_numeric(tmp["Caixas_apoio"], errors="coerce")
-    tmp = tmp.dropna(subset=["Caixas_apoio"])
-
-    if tmp.empty:
-        with col_container:
-            st.info("📊 Sem dados numéricos de Caixas de apoio para os filtros atuais")
-        return
-
-    agg = (
-        tmp.groupby("Ano_visita")["Caixas_apoio"]
-        .sum()
-        .reset_index(name="total_caixas")
-    )
-
-    chart = (
-        alt.Chart(agg)
-        .mark_bar(cornerRadius=6)
-        .encode(
-            x=alt.X("Ano_visita:O", title="Ano da visita"),
-            y=alt.Y("total_caixas:Q", title="Total de caixas de apoio"),
-            tooltip=[
-                alt.Tooltip("Ano_visita:O", title="Ano"),
-                alt.Tooltip("total_caixas:Q", title="Caixas de apoio")
-            ]
-        )
-        .properties(height=300, title="Caixas de apoio por ano da visita")
-        .configure_title(fontSize=16, font="Segoe UI", anchor="middle")
-        .configure_axis(labelFont="Segoe UI", titleFont="Segoe UI")
-    )
-
-    with col_container:
-        st.altair_chart(chart, use_container_width=True)
 
 # Layout dos gráficos:
 # Linha 1: Status x Ano  | Caixas_apoio x Ano
