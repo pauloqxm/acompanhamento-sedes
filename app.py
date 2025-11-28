@@ -659,52 +659,46 @@ if "Status" in fdf.columns and status_opts and status_sel:
 # =============================
 st.markdown("### 📈 Indicadores Principais")
 
-# Base para KPI: agregação por Latitude_2 quando existir
-kpi_df = fdf.copy()
+# Base filtrada pelos Filtros Avançados
+base_df = fdf.copy()
 
-if "Latitude_2" in kpi_df.columns:
-    # Separa quem não tem Latitude_2
-    null_part = kpi_df[kpi_df["Latitude_2"].isna()].copy()
-    non_null = kpi_df[kpi_df["Latitude_2"].notna()].copy()
+# Garante tipos numéricos nas colunas de interesse
+if "Vazão_LH" in base_df.columns:
+    base_df["Vazão_LH"] = pd.to_numeric(base_df["Vazão_LH"], errors="coerce")
+if "Vazão_estimada_LH" in base_df.columns:
+    base_df["Vazão_estimada_LH"] = pd.to_numeric(base_df["Vazão_estimada_LH"], errors="coerce")
+if "Caixas_apoio" in base_df.columns:
+    base_df["Caixas_apoio"] = pd.to_numeric(base_df["Caixas_apoio"], errors="coerce")
 
-    # Dicionário de agregação por poço (Latitude_2)
-    agg_dict = {}
+# -----------------------------
+# Contagem de poços únicos (Latitude_2)
+# -----------------------------
+if "Latitude_2" in base_df.columns:
+    # Poços com coordenada
+    non_null_lat = (
+        base_df[base_df["Latitude_2"].notna()]
+        .drop_duplicates(subset=["Latitude_2"])
+        .copy()
+    )
+    # Linhas sem Latitude_2 entram como registros avulsos
+    null_lat = base_df[base_df["Latitude_2"].isna()].copy()
 
-    # Colunas categóricas: pega a primeira ocorrência
-    for col in ["Localidade", "Município", "Bairro", "Monitorado", "Instalado", "Status"]:
-        if col in non_null.columns:
-            agg_dict[col] = "first"
+    kpi_pocos_df = pd.concat([non_null_lat, null_lat], ignore_index=True)
+else:
+    kpi_pocos_df = base_df.copy()
 
-    # Colunas numéricas principais: pega o valor máximo registrado para o poço
-    for col in ["Vazão_LH", "Vazão_estimada_LH", "Caixas_apoio"]:
-        if col in non_null.columns:
-            agg_dict[col] = "max"
+total_pocos = (
+    kpi_pocos_df["Localidade"].notna().sum()
+    if "Localidade" in kpi_pocos_df.columns
+    else len(kpi_pocos_df)
+)
 
-    # Garante que Ano_visita não quebre o groupby (se quiser, pode pegar o último ano)
-    if "Ano_visita" in non_null.columns and "Ano_visita" not in agg_dict:
-        agg_dict["Ano_visita"] = "max"
-
-    if agg_dict:
-        non_null_grouped = (
-            non_null
-            .groupby("Latitude_2", as_index=False)
-            .agg(agg_dict)
-        )
-    else:
-        # fallback, se por algum motivo não tiver colunas mapeadas
-        non_null_grouped = non_null.drop_duplicates(subset=["Latitude_2"]).copy()
-
-    # Junta poços com Latitude_2 agregados + linhas sem Latitude_2
-    kpi_df = pd.concat([non_null_grouped, null_part], ignore_index=True)
-
-# Garante que Caixas_apoio esteja numérico para a soma
-if "Caixas_apoio" in kpi_df.columns:
-    kpi_df["Caixas_apoio"] = pd.to_numeric(kpi_df["Caixas_apoio"], errors="coerce")
-
-total_pocos = len(kpi_df[kpi_df["Localidade"].notna()]) if "Localidade" in kpi_df.columns else len(kpi_df)
-total_vazao = safe_sum(kpi_df["Vazão_LH"]) if "Vazão_LH" in kpi_df.columns else 0
-total_vazao_est = safe_sum(kpi_df["Vazão_estimada_LH"]) if "Vazão_estimada_LH" in kpi_df.columns else 0
-total_caixas = safe_sum(kpi_df["Caixas_apoio"]) if "Caixas_apoio" in kpi_df.columns else 0
+# -----------------------------
+# Somas numéricas (por visita, respeitando filtros)
+# -----------------------------
+total_vazao = safe_sum(base_df["Vazão_LH"]) if "Vazão_LH" in base_df.columns else 0
+total_vazao_est = safe_sum(base_df["Vazão_estimada_LH"]) if "Vazão_estimada_LH" in base_df.columns else 0
+total_caixas = safe_sum(base_df["Caixas_apoio"]) if "Caixas_apoio" in base_df.columns else 0
 
 k1, k2, k3, k4 = st.columns(4)
 
@@ -714,7 +708,7 @@ with k1:
         <div class="kpi-card fade-in">
           <div class="kpi-label">Total de Poços</div>
           <div class="kpi-value">{total_pocos}</div>
-          <div class="kpi-sub">Ativos e monitorados</div>
+          <div class="kpi-sub">Ativos e monitorados (únicos)</div>
         </div>
         """,
         unsafe_allow_html=True
@@ -728,7 +722,7 @@ with k2:
           <div class="kpi-value">
             {total_vazao:,.0f} L/h
           </div>
-          <div class="kpi-sub">Total de vazão medida</div>
+          <div class="kpi-sub">Soma nas medições filtradas</div>
         </div>
         """.replace(",", "X").replace(".", ",").replace("X", "."),
         unsafe_allow_html=True
@@ -742,7 +736,7 @@ with k3:
           <div class="kpi-value">
             {total_vazao_est:,.0f} L/h
           </div>
-          <div class="kpi-sub">Projeção total</div>
+          <div class="kpi-sub">Projeção nas medições filtradas</div>
         </div>
         """.replace(",", "X").replace(".", ",").replace("X", "."),
         unsafe_allow_html=True
@@ -754,7 +748,7 @@ with k4:
         <div class="kpi-card fade-in">
           <div class="kpi-label">Caixas de Apoio</div>
           <div class="kpi-value">{int(total_caixas) if not math.isnan(total_caixas) else 0}</div>
-          <div class="kpi-sub">Infraestrutura instalada</div>
+          <div class="kpi-sub">Infraestrutura nas visitas filtradas</div>
         </div>
         """,
         unsafe_allow_html=True
