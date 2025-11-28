@@ -546,9 +546,34 @@ with st.expander("Filtros de Pesquisa", expanded=True):
             mes_sel = None
 
     # -------------------------
-    # Monitorado pela COGERH (liga/desliga)
+    # Município (sempre ativo)
     # -------------------------
     with col_f3:
+        mun_opts = sorted([m for m in df["Município"].dropna().unique().tolist()]) if "Município" in df.columns else []
+        mun_sel = st.multiselect(
+            "🏙️ Município",
+            options=mun_opts,
+            default=mun_opts if mun_opts else None
+        )
+
+    # -------------------------
+    # Bairro (sempre ativo)
+    # -------------------------
+    with col_f4:
+        bairro_opts = sorted([b for b in df["Bairro"].dropna().unique().tolist()]) if "Bairro" in df.columns else []
+        bairro_sel = st.multiselect(
+            "📍 Bairro",
+            options=bairro_opts,
+            default=bairro_opts if bairro_opts else None
+        )
+
+    # Segunda linha
+    col_f5, col_f6, col_f7 = st.columns(3)
+
+    # -------------------------
+    # Monitorado pela COGERH (liga/desliga)
+    # -------------------------
+    with col_f5:
         mon_opts = []
         if "Monitorado" in df.columns:
             mon_opts = sorted([m for m in df["Monitorado"].dropna().unique().tolist()])
@@ -567,7 +592,7 @@ with st.expander("Filtros de Pesquisa", expanded=True):
     # -------------------------
     # Instalado / Estado (liga/desliga)
     # -------------------------
-    with col_f4:
+    with col_f6:
         inst_opts = []
         if "Instalado" in df.columns:
             inst_opts = sorted([m for m in df["Instalado"].dropna().unique().tolist()])
@@ -583,6 +608,17 @@ with st.expander("Filtros de Pesquisa", expanded=True):
         else:
             inst_sel = None
 
+    # -------------------------
+    # Status (sempre ativo)
+    # -------------------------
+    with col_f7:
+        status_opts = sorted([s for s in df["Status"].dropna().unique().tolist()]) if "Status" in df.columns else []
+        status_sel = st.multiselect(
+            "✅ Status",
+            options=status_opts,
+            default=status_opts if status_opts else None
+        )
+
 # =============================
 # Aplicação dos filtros
 # =============================
@@ -596,13 +632,26 @@ if use_filter_ano and "Ano_visita" in fdf.columns and ano_sel:
 if use_filter_mes and "Mes_visita" in fdf.columns and mes_sel:
     fdf = fdf[fdf["Mes_visita"].isin(mes_sel)]
 
-# Monitorado
+# Município (sempre considerado se houver seleção)
+if "Município" in fdf.columns and mun_opts and mun_sel:
+    fdf = fdf[fdf["Município"].isin(mun_sel)]
+
+# Bairro (sempre considerado se houver seleção)
+if "Bairro" in fdf.columns and bairro_opts and bairro_sel:
+    fdf = fdf[fdf["Bairro"].isin(bairro_sel)]
+
+# Monitorado (condicional ao toggle)
 if use_filter_mon and "Monitorado" in fdf.columns and mon_sel:
     fdf = fdf[fdf["Monitorado"].isin(mon_sel)]
 
-# Instalado
+# Instalado (condicional ao toggle)
 if use_filter_inst and "Instalado" in fdf.columns and inst_sel:
     fdf = fdf[fdf["Instalado"].isin(inst_sel)]
+
+# Status (sempre considerado se houver seleção)
+if "Status" in fdf.columns and status_opts and status_sel:
+    fdf = fdf[fdf["Status"].isin(status_sel)]
+
 
 
 # =============================
