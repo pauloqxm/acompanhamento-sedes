@@ -502,87 +502,108 @@ st.markdown("### 🔍 Filtros Avançados")
 with st.expander("Filtros de Pesquisa", expanded=True):
     col_f1, col_f2, col_f3, col_f4 = st.columns(4)
 
+    # -------------------------
+    # Ano da visita (liga/desliga)
+    # -------------------------
     with col_f1:
-        anos = sorted([a for a in df["Ano_visita"].dropna().unique().tolist()])
-        ano_sel = st.multiselect(
-            "📅 Ano da visita",
-            options=anos,
-            default=anos if anos else None,
-            help="Selecione os anos de visita"
-        )
+        anos = []
+        if "Ano_visita" in df.columns:
+            anos = sorted([a for a in df["Ano_visita"].dropna().unique().tolist()])
 
+        use_filter_ano = st.toggle("📅 Filtrar ano da visita", value=False)
+
+        if use_filter_ano and anos:
+            ano_sel = st.multiselect(
+                "Ano da visita",
+                options=anos,
+                default=anos,
+                help="Selecione os anos de visita"
+            )
+        else:
+            ano_sel = None
+
+    # -------------------------
+    # Mês da visita (liga/desliga)
+    # -------------------------
     with col_f2:
-        meses = [m for m in df["Mes_visita"].dropna().unique().tolist()]
-        meses = sorted(meses, key=lambda x: ["Jan","Fev","Mar","Abr","Mai","Jun",
-                                             "Jul","Ago","Set","Out","Nov","Dez"].index(x)) if meses else []
-        mes_sel = st.multiselect(
-            "🗓️ Mês da visita",
-            options=meses,
-            default=meses if meses else None
-        )
+        meses = []
+        if "Mes_visita" in df.columns:
+            meses = [m for m in df["Mes_visita"].dropna().unique().tolist()]
+            if meses:
+                ordem_meses = ["Jan","Fev","Mar","Abr","Mai","Jun",
+                               "Jul","Ago","Set","Out","Nov","Dez"]
+                meses = sorted(meses, key=lambda x: ordem_meses.index(x))
 
+        use_filter_mes = st.toggle("🗓️ Filtrar mês da visita", value=False)
+
+        if use_filter_mes and meses:
+            mes_sel = st.multiselect(
+                "Mês da visita",
+                options=meses,
+                default=meses
+            )
+        else:
+            mes_sel = None
+
+    # -------------------------
+    # Monitorado pela COGERH (liga/desliga)
+    # -------------------------
     with col_f3:
-        mun_opts = sorted([m for m in df["Município"].dropna().unique().tolist()]) if "Município" in df.columns else []
-        mun_sel = st.multiselect(
-            "🏙️ Município",
-            options=mun_opts,
-            default=mun_opts if mun_opts else None
-        )
+        mon_opts = []
+        if "Monitorado" in df.columns:
+            mon_opts = sorted([m for m in df["Monitorado"].dropna().unique().tolist()])
 
+        use_filter_mon = st.toggle("📡 Filtrar Monitorado pela COGERH", value=False)
+
+        if use_filter_mon and mon_opts:
+            mon_sel = st.multiselect(
+                "Monitorado pela COGERH",
+                options=mon_opts,
+                default=mon_opts
+            )
+        else:
+            mon_sel = None
+
+    # -------------------------
+    # Instalado / Estado (liga/desliga)
+    # -------------------------
     with col_f4:
-        bairro_opts = sorted([b for b in df["Bairro"].dropna().unique().tolist()]) if "Bairro" in df.columns else []
-        bairro_sel = st.multiselect(
-            "📍 Bairro",
-            options=bairro_opts,
-            default=bairro_opts if bairro_opts else None
-        )
+        inst_opts = []
+        if "Instalado" in df.columns:
+            inst_opts = sorted([m for m in df["Instalado"].dropna().unique().tolist()])
 
-    col_f5, col_f6, col_f7 = st.columns(3)
-    with col_f5:
-        mon_opts = sorted([m for m in df["Monitorado"].dropna().unique().tolist()]) if "Monitorado" in df.columns else []
-        mon_sel = st.multiselect(
-            "📡 Monitorado pela COGERH",
-            options=mon_opts,
-            default=mon_opts if mon_opts else None
-        )
-    with col_f6:
-        inst_opts = sorted([m for m in df["Instalado"].dropna().unique().tolist()]) if "Instalado" in df.columns else []
-        inst_sel = st.multiselect(
-            "⚙️ Instalado/Estado",
-            options=inst_opts,
-            default=inst_opts if inst_opts else None
-        )
-    with col_f7:
-        status_opts = sorted([s for s in df["Status"].dropna().unique().tolist()]) if "Status" in df.columns else []
-        status_sel = st.multiselect(
-            "✅ Status",
-            options=status_opts,
-            default=status_opts if status_opts else None
-        )
+        use_filter_inst = st.toggle("⚙️ Filtrar Instalado/Estado", value=False)
 
+        if use_filter_inst and inst_opts:
+            inst_sel = st.multiselect(
+                "Instalado/Estado",
+                options=inst_opts,
+                default=inst_opts
+            )
+        else:
+            inst_sel = None
+
+# =============================
 # Aplicação dos filtros
+# =============================
 fdf = df.copy()
 
-if anos and ano_sel:
+# Ano da visita
+if use_filter_ano and "Ano_visita" in fdf.columns and ano_sel:
     fdf = fdf[fdf["Ano_visita"].isin(ano_sel)]
 
-if meses and mes_sel:
+# Mês da visita
+if use_filter_mes and "Mes_visita" in fdf.columns and mes_sel:
     fdf = fdf[fdf["Mes_visita"].isin(mes_sel)]
 
-if mun_opts and mun_sel:
-    fdf = fdf[fdf["Município"].isin(mun_sel)]
-
-if bairro_opts and bairro_sel:
-    fdf = fdf[fdf["Bairro"].isin(bairro_sel)]
-
-if mon_opts and mon_sel:
+# Monitorado
+if use_filter_mon and "Monitorado" in fdf.columns and mon_sel:
     fdf = fdf[fdf["Monitorado"].isin(mon_sel)]
 
-if inst_opts and inst_sel:
+# Instalado
+if use_filter_inst and "Instalado" in fdf.columns and inst_sel:
     fdf = fdf[fdf["Instalado"].isin(inst_sel)]
 
-if status_opts and status_sel:
-    fdf = fdf[fdf["Status"].isin(status_sel)]
 
 # =============================
 # KPIs Modernizados
