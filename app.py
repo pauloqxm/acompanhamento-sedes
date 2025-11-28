@@ -944,7 +944,14 @@ def barra_contagem_moderna(colname, titulo, col_container):
                 st.info(f"📊 Sem dados de {titulo} para os filtros atuais")
             return
 
-        chart = (
+        # Totais por ano para exibir no topo
+        totais = (
+            tmp.groupby("Ano_visita")["contagem"]
+            .sum()
+            .reset_index(name="total")
+        )
+
+        bars = (
             alt.Chart(tmp)
             .mark_bar(cornerRadius=6)
             .encode(
@@ -961,6 +968,25 @@ def barra_contagem_moderna(colname, titulo, col_container):
                     alt.Tooltip("contagem:Q", title="Poços")
                 ]
             )
+        )
+
+        labels = (
+            alt.Chart(totais)
+            .mark_text(
+                dy=-10,
+                fontSize=14,
+                fontWeight="bold",
+                color="#2d3436"
+            )
+            .encode(
+                x=alt.X("Ano_visita:O", title="Ano da visita"),
+                y=alt.Y("total:Q"),
+                text=alt.Text("total:Q", format="d")
+            )
+        )
+
+        chart = (
+            (bars + labels)
             .properties(height=300, title=f"Distribuição de {titulo} por ano da visita")
             .configure_title(fontSize=16, font="Segoe UI", anchor="middle")
             .configure_axis(labelFont="Segoe UI", titleFont="Segoe UI")
@@ -1065,6 +1091,7 @@ grafico_caixas_por_ano(top2)
 bottom1, bottom2 = st.columns(2)
 barra_contagem_moderna("Monitorado", "Monitoramento", bottom1)
 barra_contagem_moderna("Instalado", "Instalação", bottom2)
+
 
 
 # =============================
