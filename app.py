@@ -589,16 +589,47 @@ if status_opts and status_sel:
 # =============================
 st.markdown("### 📈 Indicadores Principais")
 
-# Base para KPI: linhas únicas por Latitude_2 (quando existir)
+# Base para KPI: agregação por Latitude_2 quando existir
 kpi_df = fdf.copy()
+
 if "Latitude_2" in kpi_df.columns:
+    # Separa quem não tem Latitude_2
     null_part = kpi_df[kpi_df["Latitude_2"].isna()].copy()
-    non_null_part = (
-        kpi_df[kpi_df["Latitude_2"].notna()]
-        .drop_duplicates(subset=["Latitude_2"])
-        .copy()
-    )
-    kpi_df = pd.concat([non_null_part, null_part], ignore_index=True)
+    non_null = kpi_df[kpi_df["Latitude_2"].notna()].copy()
+
+    # Dicionário de agregação por poço (Latitude_2)
+    agg_dict = {}
+
+    # Colunas categóricas: pega a primeira ocorrência
+    for col in ["Localidade", "Município", "Bairro", "Monitorado", "Instalado", "Status"]:
+        if col in non_null.columns:
+            agg_dict[col] = "first"
+
+    # Colunas numéricas principais: pega o valor máximo registrado para o poço
+    for col in ["Vazão_LH", "Vazão_estimada_LH", "Caixas_apoio"]:
+        if col in non_null.columns:
+            agg_dict[col] = "max"
+
+    # Garante que Ano_visita não quebre o groupby (se quiser, pode pegar o último ano)
+    if "Ano_visita" in non_null.columns and "Ano_visita" not in agg_dict:
+        agg_dict["Ano_visita"] = "max"
+
+    if agg_dict:
+        non_null_grouped = (
+            non_null
+            .groupby("Latitude_2", as_index=False)
+            .agg(agg_dict)
+        )
+    else:
+        # fallback, se por algum motivo não tiver colunas mapeadas
+        non_null_grouped = non_null.drop_duplicates(subset=["Latitude_2"]).copy()
+
+    # Junta poços com Latitude_2 agregados + linhas sem Latitude_2
+    kpi_df = pd.concat([non_null_grouped, null_part], ignore_index=True)
+
+# Garante que Caixas_apoio esteja numérico para a soma
+if "Caixas_apoio" in kpi_df.columns:
+    kpi_df["Caixas_apoio"] = pd.to_numeric(kpi_df["Caixas_apoio"], errors="coerce")
 
 total_pocos = len(kpi_df[kpi_df["Localidade"].notna()]) if "Localidade" in kpi_df.columns else len(kpi_df)
 total_vazao = safe_sum(kpi_df["Vazão_LH"]) if "Vazão_LH" in kpi_df.columns else 0
