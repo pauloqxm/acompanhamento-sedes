@@ -674,7 +674,7 @@ if "Caixas_apoio" in base_df.columns:
 # Contagem de poços únicos (Latitude_2)
 # -----------------------------
 if "Latitude_2" in base_df.columns:
-    # Poços com coordenada
+    # Poços com coordenada (uma linha por Latitude_2)
     non_null_lat = (
         base_df[base_df["Latitude_2"].notna()]
         .drop_duplicates(subset=["Latitude_2"])
@@ -687,6 +687,10 @@ if "Latitude_2" in base_df.columns:
 else:
     kpi_pocos_df = base_df.copy()
 
+# Garante Vazão_LH numérico também em kpi_pocos_df
+if "Vazão_LH" in kpi_pocos_df.columns:
+    kpi_pocos_df["Vazão_LH"] = pd.to_numeric(kpi_pocos_df["Vazão_LH"], errors="coerce")
+
 total_pocos = (
     kpi_pocos_df["Localidade"].notna().sum()
     if "Localidade" in kpi_pocos_df.columns
@@ -694,9 +698,12 @@ total_pocos = (
 )
 
 # -----------------------------
-# Somas numéricas (por visita, respeitando filtros)
+# Somas numéricas (respeitando filtros)
 # -----------------------------
-total_vazao = safe_sum(base_df["Vazão_LH"]) if "Vazão_LH" in base_df.columns else 0
+# Vazão Medida: soma apenas uma vez por poço (Latitude_2)
+total_vazao = safe_sum(kpi_pocos_df["Vazão_LH"]) if "Vazão_LH" in kpi_pocos_df.columns else 0
+
+# Vazão Estimada e Caixas de apoio: soma nas medições filtradas (base_df)
 total_vazao_est = safe_sum(base_df["Vazão_estimada_LH"]) if "Vazão_estimada_LH" in base_df.columns else 0
 total_caixas = safe_sum(base_df["Caixas_apoio"]) if "Caixas_apoio" in base_df.columns else 0
 
@@ -722,7 +729,7 @@ with k2:
           <div class="kpi-value">
             {total_vazao:,.0f} L/h
           </div>
-          <div class="kpi-sub">Soma nas medições filtradas</div>
+          <div class="kpi-sub">Soma por poço (sem repetição)</div>
         </div>
         """.replace(",", "X").replace(".", ",").replace("X", "."),
         unsafe_allow_html=True
@@ -753,6 +760,7 @@ with k4:
         """,
         unsafe_allow_html=True
     )
+
 
 # =============================
 # Layout Mapa + Fotos
