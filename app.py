@@ -930,6 +930,7 @@ def barra_contagem_moderna(colname, titulo, col_container):
     }
     colors = color_schemes.get(colname, ["#74b9ff", "#0984e3"])
 
+    # Caso especial: Status x Ano_visita
     if colname == "Status" and "Ano_visita" in fdf.columns:
         tmp = (
             fdf[["Ano_visita", colname]]
@@ -1003,10 +1004,68 @@ def barra_contagem_moderna(colname, titulo, col_container):
     with col_container:
         st.altair_chart(chart, use_container_width=True)
 
-g1, g2, g3 = st.columns(3)
-barra_contagem_moderna("Monitorado", "Monitoramento", g1)
-barra_contagem_moderna("Instalado", "Instalação", g2)
-barra_contagem_moderna("Status", "Status", g3)
+def grafico_caixas_por_ano(col_container):
+    """Gráfico de Caixas de apoio por ano da visita."""
+    if "Caixas_apoio" not in fdf.columns or "Ano_visita" not in fdf.columns:
+        with col_container:
+            st.info("📋 Dados de Caixas de apoio por ano não disponíveis")
+        return
+
+    tmp = (
+        fdf[["Ano_visita", "Caixas_apoio"]]
+        .dropna(subset=["Ano_visita", "Caixas_apoio"])
+        .copy()
+    )
+
+    if tmp.empty:
+        with col_container:
+            st.info("📊 Sem dados de Caixas de apoio para os filtros atuais")
+        return
+
+    tmp["Caixas_apoio"] = pd.to_numeric(tmp["Caixas_apoio"], errors="coerce")
+    tmp = tmp.dropna(subset=["Caixas_apoio"])
+
+    if tmp.empty:
+        with col_container:
+            st.info("📊 Sem dados numéricos de Caixas de apoio para os filtros atuais")
+        return
+
+    agg = (
+        tmp.groupby("Ano_visita")["Caixas_apoio"]
+        .sum()
+        .reset_index(name="total_caixas")
+    )
+
+    chart = (
+        alt.Chart(agg)
+        .mark_bar(cornerRadius=6)
+        .encode(
+            x=alt.X("Ano_visita:O", title="Ano da visita"),
+            y=alt.Y("total_caixas:Q", title="Total de caixas de apoio"),
+            tooltip=[
+                alt.Tooltip("Ano_visita:O", title="Ano"),
+                alt.Tooltip("total_caixas:Q", title="Caixas de apoio")
+            ]
+        )
+        .properties(height=300, title="Caixas de apoio por ano da visita")
+        .configure_title(fontSize=16, font="Segoe UI", anchor="middle")
+        .configure_axis(labelFont="Segoe UI", titleFont="Segoe UI")
+    )
+
+    with col_container:
+        st.altair_chart(chart, use_container_width=True)
+
+# Layout dos gráficos:
+# Linha 1: Status x Ano  | Caixas_apoio x Ano
+# Linha 2: Monitorado    | Instalado
+top1, top2 = st.columns(2)
+barra_contagem_moderna("Status", "Status", top1)
+grafico_caixas_por_ano(top2)
+
+bottom1, bottom2 = st.columns(2)
+barra_contagem_moderna("Monitorado", "Monitoramento", bottom1)
+barra_contagem_moderna("Instalado", "Instalação", bottom2)
+
 
 # =============================
 # Tabela Modernizada
