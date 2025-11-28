@@ -589,10 +589,21 @@ if status_opts and status_sel:
 # =============================
 st.markdown("### 📈 Indicadores Principais")
 
-total_pocos = len(fdf[fdf["Localidade"].notna()]) if "Localidade" in fdf.columns else len(fdf)
-total_vazao = safe_sum(fdf["Vazão_LH"]) if "Vazão_LH" in fdf.columns else 0
-total_vazao_est = safe_sum(fdf["Vazão_estimada_LH"]) if "Vazão_estimada_LH" in fdf.columns else 0
-total_caixas = safe_sum(fdf["Caixas_apoio"]) if "Caixas_apoio" in fdf.columns else 0
+# Base para KPI: linhas únicas por Latitude_2 (quando existir)
+kpi_df = fdf.copy()
+if "Latitude_2" in kpi_df.columns:
+    null_part = kpi_df[kpi_df["Latitude_2"].isna()].copy()
+    non_null_part = (
+        kpi_df[kpi_df["Latitude_2"].notna()]
+        .drop_duplicates(subset=["Latitude_2"])
+        .copy()
+    )
+    kpi_df = pd.concat([non_null_part, null_part], ignore_index=True)
+
+total_pocos = len(kpi_df[kpi_df["Localidade"].notna()]) if "Localidade" in kpi_df.columns else len(kpi_df)
+total_vazao = safe_sum(kpi_df["Vazão_LH"]) if "Vazão_LH" in kpi_df.columns else 0
+total_vazao_est = safe_sum(kpi_df["Vazão_estimada_LH"]) if "Vazão_estimada_LH" in kpi_df.columns else 0
+total_caixas = safe_sum(kpi_df["Caixas_apoio"]) if "Caixas_apoio" in kpi_df.columns else 0
 
 k1, k2, k3, k4 = st.columns(4)
 
@@ -842,11 +853,9 @@ with col_fotos:
     with st.container():
         foto_col = "Link da Foto" if "Link da Foto" in fdf.columns else None
 
-        # Começa com o dataframe filtrado geral
         fdf_gallery = fdf.copy()
         clicked = False
 
-        # Se houve clique no mapa, pega o poço mais próximo do clique
         if map_data and 'last_object_clicked' in map_data and lat_col and lon_col:
             click_info = map_data.get("last_object_clicked") or map_data.get("last_clicked")
             if click_info:
@@ -890,7 +899,6 @@ with col_fotos:
                 else:
                     items.append({"thumb": link, "src": link, "caption": caption})
 
-            # Decide se abre automaticamente a galeria
             if clicked and items:
                 st.success("📍 Visualizando fotos do poço selecionado no mapa")
                 auto_open = True
@@ -914,43 +922,84 @@ def barra_contagem_moderna(colname, titulo, col_container):
         with col_container:
             st.info(f"📋 Dados de {titulo} não disponíveis")
         return
-    tmp = (
-        fdf[[colname]]
-        .dropna()
-        .groupby(colname)
-        .size()
-        .reset_index(name="contagem")
-    )
-    if tmp.empty:
-        with col_container:
-            st.info(f"📊 Sem dados de {titulo} para os filtros atuais")
-        return
 
     color_schemes = {
         "Monitorado": ["#74b9ff", "#0984e3", "#6c5ce7"],
         "Instalado": ["#00b894", "#00cec9", "#55efc4"],
         "Status": ["#00b894", "#e17055", "#636e72", "#d63031", "#6c5ce7"]
     }
-    
     colors = color_schemes.get(colname, ["#74b9ff", "#0984e3"])
 
-    chart = (
-        alt.Chart(tmp)
-        .mark_bar(cornerRadius=8)
-        .encode(
-            x=alt.X(f"{colname}:N", title="", sort="-y", axis=alt.Axis(labelAngle=0)),
-            y=alt.Y("contagem:Q", title="Quantidade de Poços"),
-            color=alt.Color(f"{colname}:N", 
-                          scale=alt.Scale(range=colors),
-                          legend=alt.Legend(title=titulo)),
-            tooltip=[alt.Tooltip(f"{colname}:N", title=titulo), 
-                    alt.Tooltip("contagem:Q", title="Poços")]
+    if colname == "Status" and "Ano_visita" in fdf.columns:
+        tmp = (
+            fdf[["Ano_visita", colname]]
+            .dropna(subset=["Ano_visita", colname])
+            .groupby(["Ano_visita", colname])
+            .size()
+            .reset_index(name="contagem")
         )
-        .properties(height=300, title=f"Distribuição por {titulo}")
-        .configure_title(fontSize=16, font="Segoe UI", anchor="middle")
-        .configure_axis(labelFont="Segoe UI", titleFont="Segoe UI")
-        .configure_legend(labelFont="Segoe UI", titleFont="Segoe UI")
-    )
+        if tmp.empty:
+            with col_container:
+                st.info(f"📊 Sem dados de {titulo} para os filtros atuais")
+            return
+
+        chart = (
+            alt.Chart(tmp)
+            .mark_bar(cornerRadius=6)
+            .encode(
+                x=alt.X("Ano_visita:O", title="Ano da visita"),
+                y=alt.Y("contagem:Q", title="Quantidade de Poços"),
+                color=alt.Color(
+                    f"{colname}:N",
+                    scale=alt.Scale(range=colors),
+                    legend=alt.Legend(title=titulo)
+                ),
+                tooltip=[
+                    alt.Tooltip("Ano_visita:O", title="Ano"),
+                    alt.Tooltip(f"{colname}:N", title=titulo),
+                    alt.Tooltip("contagem:Q", title="Poços")
+                ]
+            )
+            .properties(height=300, title=f"Distribuição de {titulo} por ano da visita")
+            .configure_title(fontSize=16, font="Segoe UI", anchor="middle")
+            .configure_axis(labelFont="Segoe UI", titleFont="Segoe UI")
+            .configure_legend(labelFont="Segoe UI", titleFont="Segoe UI")
+        )
+    else:
+        tmp = (
+            fdf[[colname]]
+            .dropna()
+            .groupby(colname)
+            .size()
+            .reset_index(name="contagem")
+        )
+        if tmp.empty:
+            with col_container:
+                st.info(f"📊 Sem dados de {titulo} para os filtros atuais")
+            return
+
+        chart = (
+            alt.Chart(tmp)
+            .mark_bar(cornerRadius=8)
+            .encode(
+                x=alt.X(f"{colname}:N", title="", sort="-y", axis=alt.Axis(labelAngle=0)),
+                y=alt.Y("contagem:Q", title="Quantidade de Poços"),
+                color=alt.Color(
+                    f"{colname}:N",
+                    scale=alt.Scale(range=colors),
+                    legend=alt.Legend(title=titulo)
+                ),
+                tooltip=[
+                    alt.Tooltip(f"{colname}:N", title=titulo),
+                    alt.Tooltip("contagem:Q", title="Poços")
+                ]
+            )
+            .properties(height=300, title=f"Distribuição por {titulo}")
+            .configure_title(fontSize=16, font="Segoe UI", anchor="middle")
+            .configure_axis(labelFont="Segoe UI", titleFont="Segoe UI")
+            .configure_legend(labelFont="Segoe UI", titleFont="Segoe UI")
+        )
+
     with col_container:
         st.altair_chart(chart, use_container_width=True)
 
@@ -980,7 +1029,6 @@ for col in ["Vazão_LH", "Vazão_estimada_LH", "Cloretos"]:
         tabela[col] = pd.to_numeric(tabela[col], errors="coerce")
 
 def style_dataframe(df: pd.DataFrame):
-    """Formatação segura para evitar erro quando colunas não existirem."""
     fmt = {}
     if "Vazão_LH" in df.columns:
         fmt["Vazão_LH"] = "{:,.0f} L/h"
