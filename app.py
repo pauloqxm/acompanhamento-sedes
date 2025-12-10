@@ -401,7 +401,7 @@ def to_float(v):
 st.markdown("""
 <div class="app-header fade-in">
   <h1>💧 Sistema de Monitoramento de Poços</h1>
-  <p>Pedra Branca - Análise em tempo real dos poços monitorados no município</p>
+  <p>Acompanhamento dos sistemas emergênciais</p>
 </div>
 """, unsafe_allow_html=True)
 
