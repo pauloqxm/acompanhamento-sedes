@@ -1012,7 +1012,7 @@ with col_fotos:
                     st.info("🗺️ Clique em um poço no mapa para focar as fotos em um ponto específico")
                 auto_open = False
 
-            render_lightgallery_images(items, height_px=460, auto_open=auto_open)
+            render_lightgallery_images(items, height_px=420, auto_open=auto_open)
 
 # =============================
 # Gráficos Modernizados
