@@ -557,10 +557,18 @@ with st.expander("Filtros de Pesquisa", expanded=True):
         )
 
     # -------------------------
-    # Bairro (sempre ativo)
+    # Bairro (sempre ativo) - AGORA FILTRADO POR MUNICÍPIO
     # -------------------------
     with col_f4:
-        bairro_opts = sorted([b for b in df["Bairro"].dropna().unique().tolist()]) if "Bairro" in df.columns else []
+        # Se municípios foram selecionados, filtrar bairros apenas desses municípios
+        if mun_sel:
+            # Filtrar o dataframe para incluir apenas os municípios selecionados
+            df_filtrado_mun = df[df["Município"].isin(mun_sel)]
+            bairro_opts = sorted([b for b in df_filtrado_mun["Bairro"].dropna().unique().tolist()]) if "Bairro" in df.columns else []
+        else:
+            # Se nenhum município selecionado, mostrar todos os bairros
+            bairro_opts = sorted([b for b in df["Bairro"].dropna().unique().tolist()]) if "Bairro" in df.columns else []
+        
         bairro_sel = st.multiselect(
             "📍 Bairro",
             options=bairro_opts,
