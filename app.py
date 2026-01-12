@@ -508,19 +508,45 @@ with st.expander("Filtros de Pesquisa", expanded=True):
     with col_f1:
         anos = []
         if "Ano_visita" in df.columns:
+            # Base inicial de anos (todos os anos)
             anos = sorted([a for a in df["Ano_visita"].dropna().unique().tolist()])
 
         use_filter_ano = st.toggle("📅 Filtrar ano da visita", value=False)
 
         if use_filter_ano and anos:
+            # Se houver outros filtros aplicados, filtrar anos condicionalmente
+            ano_opts = anos.copy()
+            
+            # Aplicar filtro condicional baseado em outros filtros
+            df_filtrado_temp = df.copy()
+            
+            # Aplicar filtros que podem afetar os anos disponíveis
+            if mun_sel_temp := st.session_state.get('mun_sel_temp', None):
+                if "Município" in df_filtrado_temp.columns:
+                    df_filtrado_temp = df_filtrado_temp[df_filtrado_temp["Município"].isin(mun_sel_temp)]
+            
+            if bairro_sel_temp := st.session_state.get('bairro_sel_temp', None):
+                if "Bairro" in df_filtrado_temp.columns:
+                    df_filtrado_temp = df_filtrado_temp[df_filtrado_temp["Bairro"].isin(bairro_sel_temp)]
+            
+            if mes_sel_temp := st.session_state.get('mes_sel_temp', None):
+                if "Mes_visita" in df_filtrado_temp.columns:
+                    df_filtrado_temp = df_filtrado_temp[df_filtrado_temp["Mes_visita"].isin(mes_sel_temp)]
+            
+            if "Ano_visita" in df_filtrado_temp.columns:
+                ano_opts = sorted([a for a in df_filtrado_temp["Ano_visita"].dropna().unique().tolist()])
+            
             ano_sel = st.multiselect(
                 "Ano da visita",
-                options=anos,
-                default=anos,
+                options=ano_opts,
+                default=ano_opts,
                 help="Selecione os anos de visita"
             )
+            st.session_state['ano_sel_temp'] = ano_sel
         else:
             ano_sel = None
+            if 'ano_sel_temp' in st.session_state:
+                del st.session_state['ano_sel_temp']
 
     # -------------------------
     # Mês da visita (liga/desliga)
@@ -528,22 +554,49 @@ with st.expander("Filtros de Pesquisa", expanded=True):
     with col_f2:
         meses = []
         if "Mes_visita" in df.columns:
-            meses = [m for m in df["Mes_visita"].dropna().unique().tolist()]
-            if meses:
+            meses_base = [m for m in df["Mes_visita"].dropna().unique().tolist()]
+            if meses_base:
                 ordem_meses = ["Jan","Fev","Mar","Abr","Mai","Jun",
                                "Jul","Ago","Set","Out","Nov","Dez"]
-                meses = sorted(meses, key=lambda x: ordem_meses.index(x))
+                meses = sorted(meses_base, key=lambda x: ordem_meses.index(x) if x in ordem_meses else len(ordem_meses))
 
         use_filter_mes = st.toggle("🗓️ Filtrar mês da visita", value=False)
 
         if use_filter_mes and meses:
+            # Filtrar meses baseado em outros filtros
+            mes_opts = meses.copy()
+            df_filtrado_temp = df.copy()
+            
+            # Aplicar filtros que podem afetar os meses disponíveis
+            if mun_sel_temp := st.session_state.get('mun_sel_temp', None):
+                if "Município" in df_filtrado_temp.columns:
+                    df_filtrado_temp = df_filtrado_temp[df_filtrado_temp["Município"].isin(mun_sel_temp)]
+            
+            if bairro_sel_temp := st.session_state.get('bairro_sel_temp', None):
+                if "Bairro" in df_filtrado_temp.columns:
+                    df_filtrado_temp = df_filtrado_temp[df_filtrado_temp["Bairro"].isin(bairro_sel_temp)]
+            
+            if ano_sel_temp := st.session_state.get('ano_sel_temp', None):
+                if "Ano_visita" in df_filtrado_temp.columns:
+                    df_filtrado_temp = df_filtrado_temp[df_filtrado_temp["Ano_visita"].isin(ano_sel_temp)]
+            
+            if "Mes_visita" in df_filtrado_temp.columns:
+                meses_filtrados = [m for m in df_filtrado_temp["Mes_visita"].dropna().unique().tolist()]
+                if meses_filtrados:
+                    ordem_meses = ["Jan","Fev","Mar","Abr","Mai","Jun",
+                                   "Jul","Ago","Set","Out","Nov","Dez"]
+                    mes_opts = sorted(meses_filtrados, key=lambda x: ordem_meses.index(x) if x in ordem_meses else len(ordem_meses))
+            
             mes_sel = st.multiselect(
                 "Mês da visita",
-                options=meses,
-                default=meses
+                options=mes_opts,
+                default=mes_opts
             )
+            st.session_state['mes_sel_temp'] = mes_sel
         else:
             mes_sel = None
+            if 'mes_sel_temp' in st.session_state:
+                del st.session_state['mes_sel_temp']
 
     # -------------------------
     # Município (sempre ativo)
@@ -555,25 +608,50 @@ with st.expander("Filtros de Pesquisa", expanded=True):
             options=mun_opts,
             default=mun_opts if mun_opts else None
         )
+        st.session_state['mun_sel_temp'] = mun_sel
 
     # -------------------------
-    # Bairro (sempre ativo) - AGORA FILTRADO POR MUNICÍPIO
+    # Bairro (sempre ativo) - FILTRADO POR MUNICÍPIO
     # -------------------------
     with col_f4:
         # Se municípios foram selecionados, filtrar bairros apenas desses municípios
         if mun_sel:
             # Filtrar o dataframe para incluir apenas os municípios selecionados
-            df_filtrado_mun = df[df["Município"].isin(mun_sel)]
+            df_filtrado_mun = df.copy()
+            
+            # Aplicar outros filtros que podem afetar os bairros disponíveis
+            if ano_sel_temp := st.session_state.get('ano_sel_temp', None):
+                if "Ano_visita" in df_filtrado_mun.columns:
+                    df_filtrado_mun = df_filtrado_mun[df_filtrado_mun["Ano_visita"].isin(ano_sel_temp)]
+            
+            if mes_sel_temp := st.session_state.get('mes_sel_temp', None):
+                if "Mes_visita" in df_filtrado_mun.columns:
+                    df_filtrado_mun = df_filtrado_mun[df_filtrado_mun["Mes_visita"].isin(mes_sel_temp)]
+            
+            # Agora filtrar por município
+            df_filtrado_mun = df_filtrado_mun[df_filtrado_mun["Município"].isin(mun_sel)]
             bairro_opts = sorted([b for b in df_filtrado_mun["Bairro"].dropna().unique().tolist()]) if "Bairro" in df.columns else []
         else:
             # Se nenhum município selecionado, mostrar todos os bairros
-            bairro_opts = sorted([b for b in df["Bairro"].dropna().unique().tolist()]) if "Bairro" in df.columns else []
+            df_filtrado_temp = df.copy()
+            
+            # Aplicar outros filtros que podem afetar os bairros disponíveis
+            if ano_sel_temp := st.session_state.get('ano_sel_temp', None):
+                if "Ano_visita" in df_filtrado_temp.columns:
+                    df_filtrado_temp = df_filtrado_temp[df_filtrado_temp["Ano_visita"].isin(ano_sel_temp)]
+            
+            if mes_sel_temp := st.session_state.get('mes_sel_temp', None):
+                if "Mes_visita" in df_filtrado_temp.columns:
+                    df_filtrado_temp = df_filtrado_temp[df_filtrado_temp["Mes_visita"].isin(mes_sel_temp)]
+            
+            bairro_opts = sorted([b for b in df_filtrado_temp["Bairro"].dropna().unique().tolist()]) if "Bairro" in df.columns else []
         
         bairro_sel = st.multiselect(
             "📍 Bairro",
             options=bairro_opts,
             default=bairro_opts if bairro_opts else None
         )
+        st.session_state['bairro_sel_temp'] = bairro_sel
 
     # Segunda linha
     col_f5, col_f6, col_f7 = st.columns(3)
@@ -620,7 +698,27 @@ with st.expander("Filtros de Pesquisa", expanded=True):
     # Status (sempre ativo)
     # -------------------------
     with col_f7:
-        status_opts = sorted([s for s in df["Status"].dropna().unique().tolist()]) if "Status" in df.columns else []
+        # Filtrar opções de status baseado nos outros filtros
+        df_filtrado_status = df.copy()
+        
+        # Aplicar filtros que podem afetar os status disponíveis
+        if mun_sel:
+            if "Município" in df_filtrado_status.columns:
+                df_filtrado_status = df_filtrado_status[df_filtrado_status["Município"].isin(mun_sel)]
+        
+        if bairro_sel:
+            if "Bairro" in df_filtrado_status.columns:
+                df_filtrado_status = df_filtrado_status[df_filtrado_status["Bairro"].isin(bairro_sel)]
+        
+        if ano_sel_temp := st.session_state.get('ano_sel_temp', None):
+            if "Ano_visita" in df_filtrado_status.columns:
+                df_filtrado_status = df_filtrado_status[df_filtrado_status["Ano_visita"].isin(ano_sel_temp)]
+        
+        if mes_sel_temp := st.session_state.get('mes_sel_temp', None):
+            if "Mes_visita" in df_filtrado_status.columns:
+                df_filtrado_status = df_filtrado_status[df_filtrado_status["Mes_visita"].isin(mes_sel_temp)]
+        
+        status_opts = sorted([s for s in df_filtrado_status["Status"].dropna().unique().tolist()]) if "Status" in df_filtrado_status.columns else []
         status_sel = st.multiselect(
             "✅ Status",
             options=status_opts,
